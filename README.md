@@ -106,7 +106,7 @@ Manual diagnosis of incorrect answers revealed two distinct failure modes:
 ## Setup
 
 ```bash
-git clone <your-repo-url>
+git clone <https://github.com/Anishkumar25/research-assistant>
 cd research-assistant
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
@@ -115,7 +115,7 @@ pip install -r requirements.txt
 
 Create a `.env` file in the project root:
 
-- **GROQ_API_KEY =**your_key_here
+- GROQ_API_KEY =your_key_here
 Run locally:
 ```bash
 streamlit run app.py
