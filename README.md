@@ -1,45 +1,107 @@
-# AI Research Assistant — RAG over Research Papers
+# 📄 AI Research Assistant — Retrieval-Augmented Generation for Research Papers
 
-A Retrieval-Augmented Generation (RAG) system that lets you upload research papers as PDFs and ask natural-language questions about them, with answers grounded in and cited to the actual source text — including comparisons across multiple papers.
+> Upload research papers, ask natural-language questions, and get grounded, cited answers — including comparisons across multiple papers. Built from scratch to demonstrate a real understanding of every layer of a RAG pipeline, not a framework wrapped around an API call.
 
-Built from scratch (no LangChain/LlamaIndex orchestration layer) to demonstrate a working understanding of each component in a RAG pipeline, rather than gluing together a framework.
+**[Live Demo](https://researchassistant2512.streamlit.app/)** · **[Source Code](https://github.com/Anishkumar25/research-assistant/)**
+
+---
+
+## Why this project is different
+
+Most "RAG chatbot" projects stop at "upload a PDF, ask a question, get an answer." This one goes further:
+
+- **It's measured, not just demoed.** A 10-question evaluation set with known ground-truth answers gives a concrete baseline accuracy (70%), not a vague "it works great."
+- **Failure modes were diagnosed, not papered over.** Incorrect answers were traced to two distinct root causes — retrieval misses vs. generation instability — which require different fixes, and that diagnosis is documented below.
+- **Multi-document comparison actually works correctly.** Naive pooled retrieval let one document dominate the context for cross-paper questions; this was caught, diagnosed, and fixed with per-document metadata filtering (see "Key design decisions").
+- **No orchestration framework.** Built directly with PyMuPDF, sentence-transformers, and ChromaDB instead of LangChain/LlamaIndex — every step of the pipeline (chunking, embedding, retrieval, prompting) is explicit and auditable, not hidden behind abstraction layers.
 
 ## Features
 
-- PDF upload and text extraction (single or multiple documents)
-- Semantic chunking and embedding (local, no API cost for this step)
-- Vector similarity search via ChromaDB
-- Grounded answer generation via Llama 3.3 70B (Groq API), with explicit instructions to avoid hallucination
-- Inline source citations — every claim is tagged to the document it came from
-- Multi-document comparison with per-document retrieval, so every uploaded paper is guaranteed representation (not just whichever scores highest by similarity)
-- A small evaluation harness with a measured baseline accuracy
+- 📄 Multi-PDF upload and text extraction
+- ✂️ Configurable chunking with overlap to preserve cross-boundary context
+- 🧠 Local semantic embeddings (no API cost for this step)
+- 🔍 Vector similarity search via ChromaDB, with per-document metadata filtering for balanced multi-document retrieval
+- 💬 Grounded answer generation via Llama 3.3 70B (Groq API), explicitly instructed to avoid hallucination
+- 📌 Inline source citations — every claim is tagged to the exact document it came from
+- 🔀 Cross-document comparison and synthesis
+- 📊 A built-in evaluation harness with a documented accuracy baseline
+
+## Architecture
+PDF(s) Upload
+
+│
+
+▼
+
+Text Extraction (PyMuPDF)
+
+│
+
+▼
+
+Chunking (200 words, 40-word overlap)
+
+│
+
+▼
+
+Local Embedding (sentence-transformers, all-MiniLM-L6-v2, 384-dim)
+
+│
+
+▼
+
+Vector Storage (ChromaDB, chunks tagged with source document)
+
+│
+
+▼
+
+Query → Per-Document Retrieval (top-k per document, metadata-filtered)
+
+│
+
+▼
+
+Grounded Prompt Construction (labeled, cited context)
+
+│
+
+▼
+
+Llama 3.3 70B (Groq API) → Cited, Grounded Answer
 
 ## Tech stack
 
-- **PDF parsing:** PyMuPDF
-- **Embeddings:** sentence-transformers (`all-MiniLM-L6-v2`), 384-dim, runs locally
-- **Vector store:** ChromaDB
-- **LLM:** Llama 3.3 70B via Groq API
-- **UI:** Streamlit
-
-## Architecture
-PDF Upload → Text Extraction → Chunking (200 words, 40-word overlap)
-
-→ Local Embedding → ChromaDB Storage (tagged with source document)
-
-→ Query Embedding → Per-Document Retrieval (top-k per doc)
-
-→ Grounded Prompt → Llama 3.3 70B → Cited Answer
+| Layer | Technology |
+|---|---|
+| PDF parsing | PyMuPDF |
+| Embeddings | sentence-transformers (`all-MiniLM-L6-v2`) — local, free, 384-dim |
+| Vector store | ChromaDB |
+| LLM | Llama 3.3 70B via Groq API (free tier, no orchestration framework) |
+| UI | Streamlit |
+| Deployment | Streamlit Community Cloud |
 
 ## Evaluation
 
-A 10-question evaluation set was built from ground-truth facts in a test paper, covering the abstract, methodology, dataset, and results sections. Baseline accuracy: **70%** (7/10 correct).
+A 10-question evaluation set was constructed from ground-truth facts spanning the abstract, methodology, dataset, and results sections of a test paper.
 
-Diagnosis of the 3 incorrect answers showed two distinct failure modes:
-1. **Retrieval misses** — the chunk containing the specific answer ranked outside the top-k and was never seen by the model.
-2. **Generation instability** — when context was insufficient, the model sometimes generated unrelated content instead of cleanly admitting it didn't know.
+**Baseline accuracy: 70% (7/10 correct)**
 
-Fixes attempted: increased retrieval depth (`top_k` 3→5), set `temperature=0` for more deterministic output, and tightened the prompt with an explicit fallback instruction for missing information. Result: overall accuracy held at 70%, but the failure mode shifted — a notable finding in itself, suggesting retrieval quality (not just prompt strictness) is the main lever for further improvement.
+Manual diagnosis of incorrect answers revealed two distinct failure modes:
+
+1. **Retrieval misses** — the chunk containing the specific answer ranked outside the top-k similarity results and was never shown to the model, even though it existed in the document.
+2. **Generation instability** — when the retrieved context didn't contain the answer, the model occasionally generated unrelated content (e.g. an invented multiple-choice quiz) instead of cleanly admitting it didn't know.
+
+**Fixes applied:** increased retrieval depth (`top_k` 3 → 5), set `temperature=0` for deterministic output, and added an explicit, strict fallback instruction in the prompt for missing information.
+
+**Result:** overall accuracy held at 70%, but the *distribution* of errors shifted — suggesting retrieval quality, not prompt strictness alone, is the primary lever for further improvement. This is documented as-is rather than smoothed over, since the iteration process is the actual evidence of engineering rigor.
+
+## Key design decisions
+
+- **In-memory vector store per session, not persistent.** The deployed app uses a fresh in-memory ChromaDB collection per session rather than persisting to disk, avoiding ID-collision errors on re-upload and keeping each user's documents isolated.
+- **Per-document retrieval for multi-doc queries.** Initial testing showed that pooling all chunks together and taking a global top-k let one document dominate comparison answers entirely, even when the question explicitly asked about multiple papers. Switching to per-document metadata-filtered retrieval (querying each source separately, then combining) guarantees every uploaded document is represented.
+- **Local embeddings, API-based generation.** Embedding generation runs locally (free, fast, no rate limits) while only the final generation step calls an external API — minimizing cost and external dependency for the most frequently-run part of the pipeline.
 
 ## Setup
 
@@ -47,21 +109,45 @@ Fixes attempted: increased retrieval depth (`top_k` 3→5), set `temperature=0` 
 git clone <your-repo-url>
 cd research-assistant
 python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file with:
-GROQ_API_KEY=your_key_here
+Create a `.env` file in the project root:
 
-Run:
+- **GROQ_API_KEY =**your_key_here
+Run locally:
 ```bash
 streamlit run app.py
 ```
 
+## Project structure
+research-assistant/
+
+├── app.py              # Main Streamlit application
+
+├── extract_text.py     # PDF text extraction (standalone/testing)
+
+├── chunk_text.py        # Text chunking logic (standalone/testing)
+
+├── embed_chunks.py      # Embedding generation (standalone/testing)
+
+├── store_chunks.py      # Vector storage (standalone/testing)
+
+├── retrieve.py          # Semantic retrieval (standalone/testing)
+
+├── generate_answer.py   # End-to-end RAG pipeline (standalone/testing)
+
+├── eval.py              # Evaluation harness
+
+├── eval_set.json        # Ground-truth Q&A pairs for evaluation
+
+└── requirements.txt
+
 ## Limitations & future work
 
-- Retrieval is purely embedding-based; no hybrid keyword search or reranking yet
-- Chunking is fixed-size by word count, not semantically aware (e.g. doesn't respect section/paragraph boundaries)
-- Evaluation set is small (10 questions, single paper); a larger, multi-paper eval set would give more reliable accuracy estimates
-- No support for non-text PDF content (figures, tables are not parsed)
+- Retrieval is purely embedding-based; no hybrid keyword search or reranking layer yet
+- Chunking is fixed-size by word count, not semantically or section-aware
+- The evaluation set is small (10 questions, single source paper); a larger, multi-paper evaluation set would give more statistically reliable accuracy estimates
+- Figures, tables, and equations in PDFs are not parsed beyond their raw extracted text
+- No persistent multi-session storage — each session starts fresh
