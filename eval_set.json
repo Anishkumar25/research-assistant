@@ -1,0 +1,42 @@
+[
+    {
+      "question": "What TTS model does this paper apply its attention attribution method to?",
+      "expected_answer": "CapSpeech, a non-autoregressive TTS model that uses flow matching conditioned on T5-encoded style captions."
+    },
+    {
+      "question": "How many transformer layers does the flow-matching DiT backbone have?",
+      "expected_answer": "25 layers."
+    },
+    {
+      "question": "How many ODE steps are used in the generation process?",
+      "expected_answer": "24 ODE steps."
+    },
+    {
+      "question": "How many (style caption, text transcript) combinations were analyzed in this study?",
+      "expected_answer": "3,600 combinations, from 120 style captions paired with 30 text transcripts each."
+    },
+    {
+      "question": "What image-generation interpretability framework was adapted to the speech domain in this work?",
+      "expected_answer": "DAAM (Diffusion Attentive Attribution Maps), originally developed for attributing image regions to prompt tokens in Stable Diffusion."
+    },
+    {
+      "question": "Which token category (style, content, or function) showed the lowest temporal variance, and what does that indicate?",
+      "expected_answer": "Style tokens had the lowest temporal variance, indicating they act as global modulators with attention spread uniformly across time rather than localized to specific moments."
+    },
+    {
+      "question": "At which transformer layer does style-token importance peak?",
+      "expected_answer": "Layer 17."
+    },
+    {
+      "question": "What is the correlation between the word 'loud' and energy in the generated audio?",
+      "expected_answer": "A Pearson correlation of approximately +0.64 with energy."
+    },
+    {
+      "question": "What vocoder converts the refined mel-spectrogram into the final audio waveform?",
+      "expected_answer": "HiFi-GAN."
+    },
+    {
+      "question": "How does function-token importance change across ODE steps compared to style-token importance?",
+      "expected_answer": "Function-token importance increases from early to late steps, while style-token importance decays sharply (around 5.2x) — the two trends move in opposite directions."
+    }
+  ]
